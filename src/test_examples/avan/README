@@ -1,0 +1,14 @@
+An example to pull finance information from internet.
+Instead of Google & Yahoo finance that are going to be terminated this year, another provider has been used which is AlphaVantage:
+
+https://www.alphavantage.co/documentation/
+
+To run the example:
+
+$ python avan.py <list of symbols>
+
+for example:
+
+$ python avan.py MSFT AAPL
+
+
