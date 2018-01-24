@@ -12,6 +12,7 @@ class SchedulerDummy(scheduler.Scheduler):
         # init instruments
         self.fin_data_pumper_.pump_init_info(self.fin_data_consumer_)
 
+        ''''
         time.sleep(1)
 
         count = 0
@@ -19,3 +20,4 @@ class SchedulerDummy(scheduler.Scheduler):
             self.fin_data_pumper_.pump_market_data(self.fin_data_consumer_)
             count += 1
             time.sleep(5)
+        '''

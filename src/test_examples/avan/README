@@ -3,12 +3,51 @@ Instead of Google & Yahoo finance that are going to be terminated this year, ano
 
 https://www.alphavantage.co/documentation/
 
+AlphaVantage has the following historical financial data features:
+
+1. Stock (Market Data, i.e. prices etc.) Data Series
+    1.1 Realtime
+        Batch stock quotes.
+
+    1.2 Historical
+
+        1.2.1 Intraday
+            Up to 10 - 15 trading days.
+            Each bar contains values for: timestamp, open, high, low, close
+            Frequencies: 1 minute, 5min, 15min, 30min, 60min
+            Time span: 100 latest or full 10 - 15 days
+
+        1.2.2 Daily
+            Up to 20 years of historical data.
+            Bar values: date, open, high, low, close, and daily volume.
+            Time span: 100 latest or full 20 years
+
+        1.2.3 Weekly
+            Up to 20 years of historical data.
+            Bar values: last trading day of each month, open, high, low, close, monthly volume.
+
+        1.2.4 Monthly
+            Up to 20 years of historical data.
+
+2. Forex
+3. Digital/Crypto
+4. Technical Indicators
+
+==================================================================
+
+We can extend the frequencies from available: 1m, 5min, ..., monthly, etc.
+by calculating from available data. For example, for frequency 2min we can use the
+available frequency 1min and combine 2 1min bars into one 2min bar.
+So far this is not implemented.
+
+===================================================================
+
 To run the example:
 
-$ python avan.py <list of symbols>
+$ python avan.py <json request file>
 
 for example:
 
-$ python avan.py MSFT AAPL
+$ python avan.py config.json
 
 

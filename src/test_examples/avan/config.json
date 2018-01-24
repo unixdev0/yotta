@@ -1,0 +1,7 @@
+{
+  "bars" :
+          [
+             { "feedcode" : "MSFT", "freq" : "minute", "interval" : "1" }
+            ,{ "feedcode" : "AAPL", "freq" : "week", "interval" : "1" }
+          ]
+}
