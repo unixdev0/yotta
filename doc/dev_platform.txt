@@ -1,0 +1,5 @@
+Main development platform - Ubuntu 16.04 (need NVIDIA GPU drivers for GPU acceleration which is only available on Ubuntu 16.04. A number of ML libraries also require 16.04 - let's stick with it)
+Python 3.6.4 - https://anaconda.org/anaconda/python
+RabbitMQ - https://www.rabbitmq.com/#getstarted
+IDE PyCharm - https://www.jetbrains.com/pycharm/
+
