@@ -1,7 +1,7 @@
 import unittest
 import abstract_msg_broker
 import pika
-import Queue
+import queue
 import threading
 
 
@@ -22,7 +22,7 @@ class MsgBrokerRabbitMQ(abstract_msg_broker.AbstractMsgBroker):
 
     def __init__(self):
         super(MsgBrokerRabbitMQ, self).__init__('rabbitmq')
-        self.msg_queue = Queue.Queue()
+        self.msg_queue = queue.Queue()
         self.connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_PUMPER)
@@ -46,14 +46,12 @@ class MsgBrokerRabbitMQ(abstract_msg_broker.AbstractMsgBroker):
         # put body into the local queue
         self.msg_queue.put(body)
         self.channel.basic_ack(basic_deliver.delivery_tag)
-        # print "msg_broker_rabbitmq: put msg into local queue: ------------"
-        # print body
 
     def get_next_msg_for(self, queue_destination):
         try:
             item = self.msg_queue.get(True, 1)
             self.msg_queue.task_done()
-        except Queue.Empty:
+        except queue.Empty:
             item = None
         return item
 
@@ -85,7 +83,7 @@ class TesMsgBrokerRabbitMQ(unittest.TestCase):
         self.assertEquals(msg_2, got_msg_2)
         self.assertEquals(msg_3, got_msg_3)
         self.mbroker.stop()
-        print 'Done'
+        print('Done')
 
 
 if __name__ == '__main__':

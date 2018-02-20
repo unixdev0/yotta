@@ -1,7 +1,6 @@
 import fin_data_pumper2
 import requests
 import json
-import abstract_msg_broker
 import datetime
 
 # for alphavantage:
@@ -53,7 +52,12 @@ class FinDataPumperAlphaVantage(fin_data_pumper2.FinDataPumper2):
 
         result = None
         big_data_filename = None
-        j = json.loads(msg)
+
+        try:
+            j = json.loads(msg)
+        except ValueError:
+            return None
+
         command = j['command']
         if command == 'pull_bbo':
             result = self.pull_bbo(j['feedcode'])
@@ -110,7 +114,7 @@ class FinDataPumperAlphaVantage(fin_data_pumper2.FinDataPumper2):
     @staticmethod
     def sync_request(url):
         try:
-            print 'requesting ' + url + ' ------->'
+            print('requesting ', url, ' ------->')
             r = requests.get(url)
             return r.text
         except requests.RequestException as e:
@@ -120,10 +124,11 @@ class FinDataPumperAlphaVantage(fin_data_pumper2.FinDataPumper2):
 
 
 import unittest
+import abstract_msg_broker
 import msg_broker_rabbitmq
 import threading
 import pika
-import Queue
+import queue
 
 
 class TestCoreConsumerMock(threading.Thread):
@@ -134,7 +139,7 @@ class TestCoreConsumerMock(threading.Thread):
         self.channel = self.connection.channel()
         self.channel.basic_consume(self.on_msg, queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE, no_ack=False)
         self.channel.queue_declare(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE)
-        self.queue = Queue.Queue()
+        self.queue = queue.Queue()
 
     def on_msg(self, unused_channel, method, properties, body):
         self.queue.put(body)
@@ -162,7 +167,7 @@ def json_formed_well(json_data):
         return False
 
 
-class TestFindDataPumperAlhavantage(unittest.TestCase):
+class TestFinDataPumperAlhavantage(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -184,16 +189,16 @@ class TestFindDataPumperAlhavantage(unittest.TestCase):
         req_bbo_eurusd_data = '{"command":"pull_bbo", "feedcode":"EUR/USD"}'
         self.msg_broker.put_msg_for(req_bbo_eurusd_data, abstract_msg_broker.AbstractMsgBroker.QUEUE_PUMPER)
         result = self.consumer.get_result()
-        print 'got bbo result:'
-        print result
+        print("got bbo result:")
+        print(result)
         self.assertTrue(json_formed_well(result))
 
     def test_pull_historical(self):
         req_hist_data = '{"command":"pull_historical", "feedcode":"MSFT", "frequency":"week", "interval":"1"}'
         self.msg_broker.put_msg_for(req_hist_data, abstract_msg_broker.AbstractMsgBroker.QUEUE_PUMPER)
         result = self.consumer.get_result()
-        print 'got historical result:'
-        print result
+        print('got historical result:')
+        print(result)
         self.assertTrue(json_formed_well(result))
 
 

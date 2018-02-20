@@ -18,7 +18,7 @@ class Sender(threading.Thread):
             t = datetime.datetime.now().time()
             msg = 'now is: ' + t.strftime("%H:%M:%S")
             self.channel.basic_publish(exchange='', routing_key='hello', body=msg)
-            print (" [x] Sent ---> " + msg)
+            print(" [x] Sent ---> ", msg)
             time.sleep(1)
 
     def stop(self):
@@ -38,7 +38,7 @@ class Receiver(threading.Thread):
         self.channel.basic_consume(self.on_msg, queue='hello', no_ack=False)
 
     def on_msg(self, unused_channel, method, properties, body):
-        print ("<---- Received [x] : " + body)
+        print("<---- Received [x] : ", body)
         self.channel.basic_ack(method.delivery_tag)
 
     def run(self):
@@ -61,9 +61,9 @@ if __name__ == '__main__':
         try:
             time.sleep(1)
         except (KeyboardInterrupt, SystemExit):
-            print "Exiting..."
+            print("Exiting...")
             break
 
     sender.stop()
     receiver.stop()
-    print 'Done'
+    print ('Done')
