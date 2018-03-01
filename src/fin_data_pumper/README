@@ -1,0 +1,31 @@
+To start the pumper:
+
+1. Create a sqlite database:
+
+$ sqlite3 <new database filename>  < ../sql/db_schema.sql
+
+2. Make sure the initial subscription instrument set is in the 'instruments' table of the database,
+   i.e. remove or/and add other instruments, or keep the instruments as is in the table.
+   The table 'instruments' contains 'interested' instruments to be got historical market data of.
+
+3. Currently getting only 'WIKI/PRICE' tables from Quandl.
+
+4. Start 'start_pumper.py' with the database filename argument:
+
+$ python3.6 start_pumper.py <path to the database file>
+
+5. The pumper checks every 10 (hardcoded to a constant) seconds if the historical market data of interested instruments is populated.
+   If it is, no request sent to Quandl. If there is no market data for an instruments, then a request to get the table sent to Quandl.
+   If the table doesn't have the newest market data, then a request to get incremental market data sent to Quandl.
+   Received market data from Quandl is put into related 'instrument' table. For example, market data for NVDA goes to the table 'NVDA'.
+
+6. The 'interested' instruments database table 'instruments' can be adjusted dynamically by inserting or/and deleting rows to/from the table
+   via the regular SQLite command.
+   Also to check incremental updates some tables can be shrinked like:
+
+   sqlite> delete from AAPL where date > datetime('2017-12-12');
+
+   It would delete rows newer than 2017-12-12. The next pumper iteration (now hardcoded in 10 seconds) will request market data for AAPL
+   newer than 2017-12-12 and populate the table AAPL.
+
+

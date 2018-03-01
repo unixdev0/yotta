@@ -1,9 +1,9 @@
 import quandl
-import abstract_msg_broker
-import msg_broker_rabbitmq
 import fin_data_pumper2
 import json
 import datetime
+import sqlite3
+#import pandas as pd
 
 
 quandl.ApiConfig.api_key = "oJSdyTHy_foE-UjEPz3x"
@@ -28,6 +28,18 @@ class FinDataPumperQuandl(fin_data_pumper2.FinDataPumper2):
         if command == 'pull_historical':
             big_data_filename = '/tmp/hist_data_' + j['feedcode'] + '_' + '_' + datetime.datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S.%f')[:-3]
             self.pull_historical(j['feedcode'], big_data_filename)
+        elif command == 'pump_to_db_full':
+            dbname = j['dbname']
+            feedcode = j['feedcode']
+            self.pump_to_db_full(dbname, feedcode)
+            #print('pumper_quandl', j)
+            return None
+        elif command == 'pump_to_db_incremental':
+            dbname = j['dbname']
+            feedcode = j['feedcode']
+            start_date = j['start_date']
+            self.pump_to_db_incremental(dbname, feedcode, start_date)
+            return None
         else:
             return None
             # not supported by quandl
@@ -37,6 +49,26 @@ class FinDataPumperQuandl(fin_data_pumper2.FinDataPumper2):
 
     def pull_historical(self, feedcode, filename):
         quandl.get_table('WIKI/PRICES', ticker=feedcode).to_csv(filename)
+
+    def pump_to_db_full(self, dbname, feedcode):
+        tbl = quandl.get_table('WIKI/PRICES', ticker=feedcode, qopts={"columns":["date","open","high","low","close","volume","adj_open","adj_high","adj_low","adj_close","adj_volume"]})
+        self.add_to_db(dbname, feedcode, tbl)
+        #print('***********')
+
+    def pump_to_db_incremental(self, dbname, feedcode, start_date):
+        #print('dbname=', dbname, 'feedcode=', feedcode, 'start_date=', start_date)
+        tbl = quandl.get_table(
+            'WIKI/PRICES', ticker=feedcode,
+            qopts={"columns": ["date", "open", "high", "low", "close", "volume", "adj_open", "adj_high", "adj_low",
+                               "adj_close", "adj_volume"]},
+            date={'gt': start_date }
+                               )
+        self.add_to_db(dbname, feedcode, tbl)
+
+    def add_to_db(self, dbname, feedcode, tbl):
+        dbconn = sqlite3.connect(dbname)
+        tbl.to_sql(feedcode, dbconn, if_exists='append', index=False)
+        dbconn.close()
 
 
 import unittest

@@ -39,7 +39,12 @@ class MsgBrokerRabbitMQ(abstract_msg_broker.AbstractMsgBroker):
 
     def stop(self):
         self.thr.stop()
-        self.connection.close()
+
+        try:
+            self.connection.close()
+        except AttributeError:
+            pass
+
         self.thr.join()
 
     def on_message(self, unused_channel, basic_deliver, properties, body):
