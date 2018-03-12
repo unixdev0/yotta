@@ -27,12 +27,15 @@ class MsgBrokerRabbitMQ(abstract_msg_broker.AbstractMsgBroker):
         self.channel = self.connection.channel()
         self.channel.queue_declare(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_PUMPER)
         self.channel.queue_declare(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE)
+        self.channel.queue_declare(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_STATISTICS)
         self.channel.basic_consume(self.on_message, queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_PUMPER, no_ack=False)
+        self.channel.basic_consume(self.on_message, queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_STATISTICS, no_ack=False)
         self.thr = MsgBrokerRabbitMQThreadHelper(self.channel)
 
     def reset_queues(self):
         self.channel.queue_purge(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_PUMPER)
         self.channel.queue_purge(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE)
+        self.channel.queue_purge(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_STATISTICS)
 
     def start(self):
         self.thr.start()

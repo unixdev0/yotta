@@ -4,6 +4,7 @@ class AbstractMsgBroker(object):
     # queue destination
     QUEUE_PUMPER = 'dest_pumper'
     QUEUE_CORE = 'dest_core'
+    QUEUE_STATISTICS = 'dest_statistics'
 
     def __init__(self, name):
         self.name = name
