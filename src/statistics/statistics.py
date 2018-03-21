@@ -1,6 +1,8 @@
 import json
 import sqlite3
 import pandas as pd
+import numpy as np
+import math
 import time
 import sys
 import threading
@@ -98,11 +100,18 @@ class Statistics(threading.Thread):
                 column = j['column']
                 period = j['period']
                 up, down = self.bollinger_band_db(dbpath, instrument, column, period)
-                tbl_name = 'up_' + instrument + '_' + str(int(round(time.time() * 1000)))
-                Statistics.to_db_table(tbl_name, 'up', instrument, up, dbconn)
+                df = pd.merge(up.to_frame(), down.to_frame(), left_index=True, right_index=True)
+                tbl_name = 'bollinger_band_' + instrument + '_' + str(int(round(time.time() * 1000)))
+                Statistics.to_db_table(tbl_name, 'bollinger_band', instrument, df, dbconn)
                 result_tables.append(tbl_name)
-                tbl_name = 'down_' + instrument + '_' + str(int(round(time.time() * 1000)))
-                Statistics.to_db_table(tbl_name, 'down', instrument, down, dbconn)
+            elif stats == "historical_volatility":
+                column = j['column']
+                basic_period = j['basic_period']
+                period = j['period']
+                annual_period = j['annual_period']
+                hvol = self.hist_volatility_db(dbpath, instrument, column, basic_period, period, annual_period)
+                tbl_name = 'hist_volatility_' + instrument + '_' + str(int(round(time.time() * 1000)))
+                Statistics.to_db_table(tbl_name, 'hist_volatility', instrument, hvol, dbconn)
                 result_tables.append(tbl_name)
 
         except KeyError:
@@ -124,9 +133,41 @@ class Statistics(threading.Thread):
         return result
 
     @staticmethod
+    def set_datetime(df):
+        df['date'] = df['date'].apply(pd.to_datetime)
+        df.set_index('date', inplace=True)
+        return df
+
+    # day to day return in case len(xarr) = 2
+    @staticmethod
+    def continuously_compounded_return(xarr):
+        if len(xarr) < 2:
+            return np.NaN
+        last_idx = len(xarr) - 1
+        if xarr[0] == 0 or xarr[0] is None:
+            return np.NaN
+        return math.log(xarr[last_idx] / xarr[0])
+
+    # period = how many basic_period in it
+    @staticmethod
+    def hist_volatility(df, column="close", basic_period=1, period=21, annual_period=252):
+        Statistics.set_datetime(df)
+        cc_ret = df[column].rolling(window=basic_period+1).apply(Statistics.continuously_compounded_return)
+        std = cc_ret.rolling(window=period, min_periods=period-1).std()
+        sq = math.sqrt(annual_period)
+        hvol = std.apply(lambda x: x*sq)
+        return hvol
+
+    @staticmethod
+    def hist_volatility_db(dbpath, instrument, column="close", basic_period=1, period=21, annual_period=252):
+        df = Statistics.read_from_db(dbpath, instrument)
+        return Statistics.hist_volatility(df, column, basic_period, period, annual_period)
+
+    @staticmethod
     def sma(df, column="close", period=20):
         if df is None:
             return None
+        Statistics.set_datetime(df)
         return df[column].rolling(window=period, min_periods=period - 1).mean()
 
     @staticmethod
@@ -138,6 +179,7 @@ class Statistics(threading.Thread):
     def ema(df, column="close", period=20):
         if df is None:
             return None
+        Statistics.set_datetime(df)
         return df[column].ewm(span=period, min_periods=period - 1).mean()
 
     @staticmethod
@@ -150,6 +192,7 @@ class Statistics(threading.Thread):
         if df is None:
             return None
         # wilder RSI
+        Statistics.set_datetime(df)
         delta = df[column].diff()
         up, down = delta.copy(), delta.copy()
 
@@ -171,6 +214,7 @@ class Statistics(threading.Thread):
     def macd(df, n_fast=12, n_slow=26, n_sign=9, column="close"):
         if df is None:
             return None, None, None
+        Statistics.set_datetime(df)
         fast = df[column].ewm(span=n_fast, min_periods=n_fast - 1).mean()
         slow = df[column].ewm(span=n_slow, min_periods=n_slow - 1).mean()
         mcd = fast - slow
@@ -188,6 +232,7 @@ class Statistics(threading.Thread):
     def bollinger_band(df, column="close", period=20):
         if df is None:
             return None
+        Statistics.set_datetime(df)
         sma = df[column].rolling(window=period, min_periods=period - 1).mean()
         std = df[column].rolling(window=period, min_periods=period - 1).std()
         up = (sma + (std * 2))
@@ -209,8 +254,8 @@ class TestStatisticsConsumerMock(threading.Thread):
         super(TestStatisticsConsumerMock, self).__init__()
         self.connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
         self.channel = self.connection.channel()
-        self.channel.basic_consume(self.on_msg, queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE, no_ack=False)
         self.channel.queue_declare(queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE)
+        self.channel.basic_consume(self.on_msg, queue=abstract_msg_broker.AbstractMsgBroker.QUEUE_CORE, no_ack=False)
         self.queue = queue.Queue()
 
     def on_msg(self, unused_channel, method, properties, body):
@@ -236,8 +281,8 @@ def display_tables(dbpath, tables):
     dbconn = sqlite3.connect(dbpath)
     plt.figure()
     for tbl in tables:
-        #print("**** displaying " + tbl + " ********")
-        df = pd.read_sql_query("select close from " + tbl + ";", dbconn)
+        df = pd.read_sql_query("select * from " + tbl + ";", dbconn)
+        Statistics.set_datetime(df)
         df.plot(title=tbl, grid=True, figsize=(16,8), label=tbl)
     plt.legend()
     plt.show()
@@ -252,11 +297,9 @@ def add_to_tables_to_drop(tables, json_str):
 
 
 def drop_tables(dbpath, tables):
-    #print("drop table ++++++++", tables)
     dbconn = sqlite3.connect(dbpath)
     cursor = dbconn.cursor()
     for tbl in tables:
-        #print("drop table *****", tbl)
         cursor.execute('drop table ' + tbl + ';')
     dbconn.commit()
     dbconn.close()
@@ -264,6 +307,7 @@ def drop_tables(dbpath, tables):
 
 if __name__ == "__main__":
 
+    #"""
     consumer = TestStatisticsConsumerMock()
     consumer.start()
     msg_broker = msg_broker_rabbitmq.MsgBrokerRabbitMQ()
@@ -307,6 +351,14 @@ if __name__ == "__main__":
     print(result)
     add_to_tables_to_drop(tables_to_drop, result)
 
+    request = '{"statistics":"historical_volatility","dbpath":"../../db/yotta.sqlite","instrument":"MSFT","column":"close","basic_period":1,"period":21,"annual_period":252}'
+    msg_broker.put_msg_for(request, abstract_msg_broker.AbstractMsgBroker.QUEUE_STATISTICS)
+    print("main: put request for QUEUE_STATISTICS: ", request)
+    result = consumer.get_result()
+    print("got result:")
+    print(result)
+    add_to_tables_to_drop(tables_to_drop, result)
+
     while True:
         try:
             time.sleep(1)
@@ -322,18 +374,18 @@ if __name__ == "__main__":
     drop_tables(dbpath, tables_to_drop)
 
     print("Done.")
+    #"""
 
 
-
-"""
+    """
     if len(sys.argv) != 3:
         print("usage: python3.6 statistics.py <dbpath> <instrument>")
         sys.exit(-1)
 
     dbpath = sys.argv[1]
     instrument = sys.argv[2]
-    sma = Statistics.sma_db(dbpath, instrument)
 
+    sma = Statistics.sma_db(dbpath, instrument)
     ema = Statistics.ema_db(dbpath, instrument)
 
     plt.figure()
@@ -341,7 +393,7 @@ if __name__ == "__main__":
     if sma is not None:
         sma.plot(title=instrument, grid=True, figsize=(16,8), label='SMA')
     if ema is not None:
-        ema.plot(title=instrument, grid=True, figsize=(16,8),label='EMA')
+        ema.plot(title=instrument, grid=True, figsize=(16,8), label='EMA')
 
     plt.legend()
     plt.show()
@@ -366,4 +418,18 @@ if __name__ == "__main__":
 
     plt.legend()
     plt.show()
-"""
+
+    plt.figure()
+    up, down = Statistics.bollinger_band_db(dbpath, instrument)
+    title = instrument + " Bollinger Band"
+    up.plot(title=title, grid=True, figsize=(16,8), label='UP')
+    down.plot(title=title, grid=True, figsize=(16,8), label='DOWN')
+    plt.legend()
+    plt.show()
+
+    plt.figure()
+    hvol = Statistics.hist_volatility_db(dbpath, instrument)
+    hvol.plot(title=instrument, grid=True, figsize=(16,8), label='HISTORICAL VOLATILITY')
+    plt.legend()
+    plt.show()
+    """
